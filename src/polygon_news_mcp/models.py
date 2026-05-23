@@ -10,7 +10,7 @@ Coverage target: **100 %**.
 from __future__ import annotations
 
 import re
-from typing import Annotated, Final
+from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
@@ -120,6 +120,53 @@ class GetServerInfoInput(_BaseInput):
 
 
 # ---------------------------------------------------------------------------
+# v0.2 — Sprint C schemas
+# ---------------------------------------------------------------------------
+
+
+class GetNewsSentimentAggregateInput(_BaseInput):
+    """Input for ``get_news_sentiment_aggregate``.
+
+    Aggregates the ``insights[].sentiment`` annotations on Polygon news
+    articles over a fixed look-back window to produce a single per-ticker
+    sentiment summary (distribution, weighted score, top publishers,
+    significant articles).
+
+    The aggregation re-uses the existing ``get_ticker_news`` cache, so
+    this tool issues at most one upstream Polygon request per
+    ``(ticker, window_days)`` pair within the news cache TTL.
+    """
+
+    ticker: Ticker
+    window_days: Literal[1, 7, 30] = 7
+
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def _upper_ticker(cls, v: object) -> object:
+        return _normalise_ticker(v)
+
+
+class GetDividendsInput(_BaseInput):
+    """Input for ``get_dividends``.
+
+    Polygon endpoint: ``GET /v3/reference/dividends?ticker=...``.
+
+    ``dividend_type`` mirrors Polygon's filter values (``"CD"`` / ``"SC"``
+    / ``""``).  We accept user-friendly synonyms (``regular`` / ``special``
+    / ``unspecified`` / ``all``) and translate them inside the tool layer.
+    """
+
+    ticker: Ticker
+    since_days: int = Field(default=365, ge=1, le=3650)
+    dividend_type: Literal["all", "regular", "special", "unspecified"] = "all"
+
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def _upper_ticker(cls, v: object) -> object:
+        return _normalise_ticker(v)
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — lets ``get_server_info`` enumerate tools without importing
 # the server module (avoids a circular import in __init__).
 # ---------------------------------------------------------------------------
@@ -129,6 +176,8 @@ _SUPPORTED_TOOLS: Final[tuple[str, ...]] = (
     "get_market_news",
     "get_ticker_details",
     "list_sec_filings_index",
+    "get_news_sentiment_aggregate",
+    "get_dividends",
     "health_check",
     "get_server_info",
 )
@@ -141,7 +190,9 @@ def supported_tool_names() -> list[str]:
 
 __all__ = [
     "TICKER_RE",
+    "GetDividendsInput",
     "GetMarketNewsInput",
+    "GetNewsSentimentAggregateInput",
     "GetServerInfoInput",
     "GetTickerDetailsInput",
     "GetTickerNewsInput",

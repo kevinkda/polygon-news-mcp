@@ -1,7 +1,7 @@
-"""Tool implementations for the 7 outward-facing MCP tools."""
+"""Tool implementations for the 8 outward-facing MCP tools."""
 
 from __future__ import annotations
 
-from . import details, filings, meta, news
+from . import details, dividends, filings, meta, news, sentiment
 
-__all__ = ["details", "filings", "meta", "news"]
+__all__ = ["details", "dividends", "filings", "meta", "news", "sentiment"]

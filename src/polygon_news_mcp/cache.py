@@ -4,6 +4,7 @@ TTLs (per task spec):
     * news_cache           — 1 h  (news feeds churn fast)
     * ticker_details_cache — 24 h (reference data is stable)
     * filings_index_cache  — 6 h  (Polygon's SEC filings index)
+    * dividends_cache      — 24 h (dividends are declared on a slow cadence)
 
 Storage layout follows ``${XDG_STATE_HOME}/polygon-news-mcp/cache.duckdb``,
 parent ``0o700``, file ``0o600`` on POSIX.
@@ -41,6 +42,7 @@ log = logging.getLogger(__name__)
 DEFAULT_TTL_NEWS_S: Final[int] = 1 * 3600
 DEFAULT_TTL_TICKER_DETAILS_S: Final[int] = 24 * 3600
 DEFAULT_TTL_FILINGS_INDEX_S: Final[int] = 6 * 3600
+DEFAULT_TTL_DIVIDENDS_S: Final[int] = 24 * 3600
 
 CACHE_DB_FILENAME: Final[str] = "cache.duckdb"
 CACHE_DIR_NAME: Final[str] = "polygon-news-mcp"
@@ -121,6 +123,15 @@ _SCHEMA_DDL: Final[tuple[str, ...]] = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS dividends_cache (
+        cache_key VARCHAR PRIMARY KEY,
+        ticker VARCHAR,
+        fetched_at TIMESTAMP,
+        raw_json JSON,
+        ttl_seconds INTEGER DEFAULT 86400
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS cache_events (
         ts TIMESTAMP,
         kind VARCHAR,
@@ -133,6 +144,7 @@ _TABLE_NAMES: Final[tuple[str, ...]] = (
     "news_cache",
     "ticker_details_cache",
     "filings_index_cache",
+    "dividends_cache",
 )
 
 
@@ -413,6 +425,24 @@ class Cache:
             ticker=ticker,
         )
 
+    def get_dividends(self, params: dict[str, Any]) -> dict[str, Any] | None:
+        return self._get_json_row("dividends_cache", _hash_params(params))
+
+    def put_dividends(
+        self,
+        params: dict[str, Any],
+        raw: dict[str, Any],
+        *,
+        ticker: str | None = None,
+    ) -> None:
+        self._put_json_row(
+            "dividends_cache",
+            _hash_params(params),
+            raw,
+            DEFAULT_TTL_DIVIDENDS_S,
+            ticker=ticker,
+        )
+
     # --------------------------------------------------------------- stats
 
     def get_stats(self) -> CacheStats:
@@ -519,6 +549,7 @@ def reset_cache_singleton() -> None:
 __all__ = [
     "CACHE_DB_FILENAME",
     "CACHE_DIR_NAME",
+    "DEFAULT_TTL_DIVIDENDS_S",
     "DEFAULT_TTL_FILINGS_INDEX_S",
     "DEFAULT_TTL_NEWS_S",
     "DEFAULT_TTL_TICKER_DETAILS_S",
