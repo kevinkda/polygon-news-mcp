@@ -1,4 +1,4 @@
-"""FastMCP server entry point — 7 outward-facing tools.
+"""FastMCP server entry point — 8 outward-facing tools.
 
 The first thing this module does is harden stdio so no stray ``print`` /
 log line pollutes the JSON-RPC stream:
@@ -100,12 +100,14 @@ from .errors import (  # noqa: E402
     PolygonValidationError,
 )
 from .models import (  # noqa: E402
+    GetDividendsInput,
     GetMarketNewsInput,
+    GetNewsSentimentAggregateInput,
     GetTickerDetailsInput,
     GetTickerNewsInput,
     ListSecFilingsIndexInput,
 )
-from .tools import details, filings, meta, news  # noqa: E402
+from .tools import details, dividends, filings, meta, news, sentiment  # noqa: E402
 
 log = logging.getLogger("polygon_news_mcp.server")
 
@@ -229,6 +231,62 @@ def _build_mcp() -> FastMCP:
         try:
             args = ListSecFilingsIndexInput(ticker=ticker, since_days=since_days)
             return await filings.list_sec_filings_index_impl(args)
+        except PolygonError as exc:
+            return _frame_error(exc)
+
+    @mcp_app.tool()
+    async def get_news_sentiment_aggregate(
+        ticker: str,
+        window_days: int = 7,
+    ) -> dict[str, Any]:
+        """Aggregate Polygon's news ``insights[].sentiment`` for *ticker* over a window.
+
+        Returns the per-window sentiment distribution
+        (``{positive, neutral, negative}``), a weighted score in
+        ``[-1.0, +1.0]``, the top-5 publishers by article count, and a
+        short list of the most "significant" articles (publisher
+        diversity + sentiment magnitude heuristic).
+
+        ``window_days`` must be one of ``1``, ``7``, or ``30``.  The
+        underlying news pull is DuckDB-cached at 1 h TTL, so a typical
+        call costs at most one upstream Polygon request per
+        ``(ticker, window_days)`` pair.
+        """
+        try:
+            args = GetNewsSentimentAggregateInput(
+                ticker=ticker,
+                window_days=window_days,  # type: ignore[arg-type]
+            )
+            return await sentiment.get_news_sentiment_aggregate_impl(args)
+        except PolygonError as exc:
+            return _frame_error(exc)
+
+    @mcp_app.tool()
+    async def get_dividends(
+        ticker: str,
+        since_days: int = 365,
+        dividend_type: str = "all",
+    ) -> dict[str, Any]:
+        """Return Polygon's dividend history for *ticker*.
+
+        Each row carries ``ex_dividend_date``, ``pay_date``,
+        ``declaration_date``, ``record_date``, ``cash_amount``,
+        ``currency``, ``frequency``, and a normalised ``dividend_type``
+        (``regular`` / ``special`` / ``unspecified``).
+
+        ``dividend_type`` filters server-side: ``all`` (no filter),
+        ``regular`` (Polygon ``CD``), ``special`` (Polygon ``SC``),
+        ``unspecified`` (Polygon's empty-type rows).
+        ``since_days`` defaults to 365 and is bounded at 3650 (≈ 10 y).
+        TTL: 24 h.
+        """
+        try:
+            args = GetDividendsInput(
+                ticker=ticker,
+                since_days=since_days,
+                dividend_type=dividend_type,  # type: ignore[arg-type]
+            )
+            return await dividends.get_dividends_impl(args)
         except PolygonError as exc:
             return _frame_error(exc)
 

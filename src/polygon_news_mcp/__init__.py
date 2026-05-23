@@ -1,7 +1,7 @@
 """Polygon.io Read-only MCP Server.
 
-A Model Context Protocol (MCP) server exposing 6 tools that wrap the
-Polygon.io public API (4 business + 2 meta tools).
+A Model Context Protocol (MCP) server exposing 8 tools that wrap the
+Polygon.io public API (6 business + 2 meta tools).
 
 Public modules:
     - :mod:`polygon_news_mcp.server` — FastMCP entry point.
