@@ -3,8 +3,8 @@
 [English](./README.md) | [简体中文](./README_zh.md)
 
 只读 **Model Context Protocol (MCP)** 服务器，将
-[Polygon.io](https://polygon.io/) 公开 API 包装为 **6 个工具**
-（5 业务 + 2 meta），可在 Cursor、Claude Code 以及任意 MCP 客户端中使用。
+[Polygon.io](https://polygon.io/) 公开 API 包装为 **8 个工具**
+（6 业务 + 2 meta），可在 Cursor、Claude Code 以及任意 MCP 客户端中使用。
 
 > **只读** —— 每个工具只对 `https://api.polygon.io/` 发起 HTTPS GET，不会回写。
 
@@ -15,18 +15,23 @@
 `polygon-news-mcp` 是
 [`schwab-marketdata-mcp`](https://github.com/kevinkda/schwab-marketdata-mcp) 和
 [`sec-edgar-mcp`](https://github.com/kevinkda/sec-edgar-mcp) 的姐妹仓，专门补
-Schwab 行情接口缺失的能力：**新闻 / 标的元数据 / 带情绪的 SEC filings 索引**。
+Schwab 行情接口缺失的能力：**新闻 / 标的元数据 / 带情绪的 SEC filings 索引 /
+分红历史**。
 
 | 能力 | Schwab MD | SEC EDGAR | **Polygon（本仓）** |
 | --- | --- | --- | --- |
 | 行情、K 线、期权链 | ✅ | ❌ | ❌ |
 | 财报正文（10-K/10-Q/8-K） | ❌ | ✅ | 仅索引 |
 | 新闻 + 情绪打分 | ❌ | ❌ | ✅ |
+| 新闻情绪聚合（窗口） | ❌ | ❌ | ✅（v0.2 新增） |
 | 标的元数据 | 部分 | 部分 | ✅ |
+| 分红历史 | 部分 | ❌ | ✅（v0.2 新增） |
+| 财报日历（earnings calendar） | 部分 | 8-K 2.02 | 推迟到 v0.3 |
 
 三个仓库共享同一套硬化纪律：
 
-- DuckDB 本地缓存（news 1 h；ticker_details 24 h；filings_index 6 h）。
+- DuckDB 本地缓存（news 1 h；ticker_details 24 h；filings_index 6 h；
+  dividends 24 h）。
 - httpx 异步客户端 + 令牌桶限速（免费档：5 req/min）。
 - Pydantic v2 入参校验（ticker 正则锚定）。
 - stdio 加固，日志永远不会污染 JSON-RPC 流。
@@ -68,7 +73,13 @@ uv run polygon-news-mcp        # 在 stdio 上启动 MCP 服务器
 
 ## 工具清单
 
-服务器对外暴露 **6 个工具**：4 业务 + 2 meta。
+服务器对外暴露 **8 个工具**：6 业务 + 2 meta。
+
+> **`get_earnings_calendar` 推迟到 v0.3**：Polygon 免费档 REST 没有专门的
+> earnings calendar 端点（只有 `/vX/reference/financials` 用于已申报的
+> 财报报表）。在付费档接通之前，可以用
+> `sec-edgar-mcp.get_8k_with_items(item_codes=["2.02"])` 检测 earnings 8-K
+> 公告作为替代——详见 [`docs/REGISTER.md`](./docs/REGISTER.md#earnings-calendar-fallback)。
 
 | Tool | 何时用 | 入参 | 缓存 TTL |
 | --- | --- | --- | --- |
@@ -76,6 +87,8 @@ uv run polygon-news-mcp        # 在 stdio 上启动 MCP 服务器
 | `get_market_news` | 拉全市场最近新闻 | `limit=20`, `since_hours=24` | 1 h |
 | `get_ticker_details` | 拉 ticker 元数据（与 Schwab 互补） | `ticker` | 24 h |
 | `list_sec_filings_index` | 拉 Polygon 的 SEC filings 索引（含 sentiment / category） | `ticker`, `since_days=90` | 6 h |
+| `get_news_sentiment_aggregate` | 把新闻 sentiment 按 1d/7d/30d 窗口聚合（分布 + 加权得分 + top publishers + 显著文章） | `ticker`, `window_days=7` | 跟 news 共用 1 h |
+| `get_dividends` | 拉分红历史（ex/pay/declaration/record + cash_amount + 类型） | `ticker`, `since_days=365`, `dividend_type="all"` | 24 h |
 | `health_check` | 本地健康探针（不调 Polygon） | 无 | n/a |
 | `get_server_info` | 本地版本/工具列表（不调 Polygon） | 无 | n/a |
 

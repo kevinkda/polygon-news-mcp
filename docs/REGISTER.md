@@ -35,13 +35,15 @@ Open Cursor → Settings → MCP → "Add New MCP Server", or edit
 - `envFile` points at the `.env` you populated; Cursor reads it before
   spawning the server so `POLYGON_API_KEY` reaches the process.
 
-Restart Cursor.  In the agent panel you should see 6 tools come online:
+Restart Cursor.  In the agent panel you should see 8 tools come online:
 
 ```text
 get_ticker_news
 get_market_news
 get_ticker_details
 list_sec_filings_index
+get_news_sentiment_aggregate
+get_dividends
 health_check
 get_server_info
 ```
@@ -113,3 +115,37 @@ or `env` in the host config.
 | `PolygonAuthError(status=403)` | endpoint not in your plan | upgrade your Polygon plan, or stop using that tool |
 | `PolygonRateLimitError` | exceeded plan rate limit | lower `POLYGON_RATE_LIMIT_PER_MIN`, upgrade plan |
 | `PolygonNotFoundError: ticker:XYZ` | ticker not in Polygon's catalog | check spelling / case |
+
+---
+
+## Earnings calendar fallback
+
+`get_earnings_calendar` is **deferred to v0.3** pending Polygon paid-tier
+validation.  Polygon's free-tier REST surface does not include a
+dedicated earnings-calendar endpoint with EPS / revenue
+estimates-vs-actuals; only `/vX/reference/financials` (filed financial
+statements) is available, and that endpoint requires a paid plan
+(Starter $29+/mo) for full historical coverage.
+
+Until a paid Polygon tier is wired up, use the SEC EDGAR fallback —
+8-K Item 2.02 ("Results of Operations and Financial Condition") is the
+canonical earnings-release form, and `sec-edgar-mcp` can list and read
+those filings directly:
+
+```python
+# Detect every earnings 8-K filed in the last 30 days for AAPL.
+sec_edgar_mcp.get_8k_with_items(
+    ticker="AAPL",
+    item_codes=["2.02"],
+    since_days=30,
+)
+```
+
+The SEC EDGAR feed lags Polygon's real-time earnings calendar by a few
+minutes (companies file the 8-K shortly *after* the press release), so
+this fallback is suited for *post-announcement* analysis (parsing the
+press-release exhibit, computing the surprise vs the prior consensus
+once the consensus is known) rather than *pre-announcement*
+calendar-driven scans.  For pre-announcement scans, upgrade Polygon to
+a tier that includes `/vX/reference/financials` and re-open the v0.3
+ticket.

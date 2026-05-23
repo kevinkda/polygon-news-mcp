@@ -7,8 +7,8 @@
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 
 Read-only **Model Context Protocol (MCP)** server that wraps the
-[Polygon.io](https://polygon.io/) public API as **6 tools**
-(4 business + 2 meta) for use inside Cursor, Claude Code, and any
+[Polygon.io](https://polygon.io/) public API as **8 tools**
+(6 business + 2 meta) for use inside Cursor, Claude Code, and any
 MCP-aware agent.
 
 > **Read-only** — every tool issues plain HTTPS GETs against
@@ -30,6 +30,8 @@ the gap that Schwab's market-data feed leaves open: **news**, ticker
 | Filings (10-K / 10-Q / 8-K) | no        | yes       | index only         |
 | News + sentiment            | no        | no        | yes                |
 | Ticker reference metadata   | partial   | partial   | yes                |
+| Dividends                   | partial   | no        | yes                |
+| Earnings calendar           | partial   | 8-K 2.02  | deferred to v0.3   |
 
 All three repos share the same hardening discipline:
 
@@ -78,7 +80,15 @@ Register the server with Cursor / Claude Desktop — see
 
 ## Tooling surface
 
-The server exposes **6 tools**: 4 business + 2 meta.
+The server exposes **8 tools**: 6 business + 2 meta.
+
+> **`get_earnings_calendar` is deferred to v0.3 pending Polygon paid-tier
+> validation.** Polygon's free-tier REST surface does not include a
+> dedicated earnings-calendar endpoint (only `/vX/reference/financials`
+> for filed financial statements).  Until paid-tier access is wired up,
+> use `sec-edgar-mcp.get_8k_with_items(item_codes=["2.02"])` to detect
+> earnings 8-K filings as a fallback — see
+> [`docs/REGISTER.md`](./docs/REGISTER.md#earnings-calendar-fallback).
 
 ### `get_ticker_news`
 
@@ -139,6 +149,48 @@ The server exposes **6 tools**: 4 business + 2 meta.
   list_sec_filings_index(ticker="AAPL", since_days=180)
   ```
 
+### `get_news_sentiment_aggregate`
+
+- **When to use:** to roll up Polygon's per-article
+  `insights[].sentiment` annotations into a single per-ticker summary
+  over a fixed look-back window — the "what's the news mood on $TICKER
+  this week / this month" query.  Drives the *shakeout-with-news*
+  playbook (combine with Schwab's price action + a news sentiment
+  reading to confirm or reject a shakeout).
+- **Input:** `ticker: str`, `window_days: 1 | 7 | 30 = 7`.
+- **Returns:** `{ ticker, window_days, total_articles,
+  sentiment_distribution: { positive, neutral, negative },
+  sentiment_score (-1.0 to +1.0), top_publishers: [{ publisher, count }],
+  most_significant_articles: [{ title, published_utc, sentiment,
+  publisher, article_url }] }`.
+- **Example call:**
+
+  ```python
+  get_news_sentiment_aggregate(ticker="MSFT", window_days=30)
+  ```
+
+  This does **not** issue a new Polygon request when the underlying
+  `get_ticker_news` cache is warm — the aggregation is in-process.
+
+### `get_dividends`
+
+- **When to use:** to fetch a ticker's dividend history with full
+  declaration / record / ex-dividend / pay dates and the cash amount.
+  Drives the *dividend-tracker* playbook — pair with Schwab Market Data
+  for the price action around each ex-date.
+- **Input:** `ticker: str`, `since_days: int = 365` (1-3650),
+  `dividend_type: "all" | "regular" | "special" | "unspecified" = "all"`.
+- **Returns:** `{ ticker, since_days, count, dividends: [{ ticker,
+  ex_dividend_date, pay_date, declaration_date, record_date, cash_amount,
+  currency, frequency, dividend_type }, ...] }`.
+  `dividend_type` is normalised to `"regular"` (Polygon `CD`),
+  `"special"` (Polygon `SC`), or `"unspecified"`.
+- **Example call:**
+
+  ```python
+  get_dividends(ticker="AAPL", since_days=730, dividend_type="regular")
+  ```
+
 ### `health_check` (meta)
 
 Local probe: returns server version, cache state, rate-limit budget, API
@@ -158,6 +210,7 @@ Never calls Polygon.
 | `news_cache`           | 1 h  | News feeds churn fast.                             |
 | `ticker_details_cache` | 24 h | Reference data is stable.                          |
 | `filings_index_cache`  | 6 h  | Filings are filed throughout each business day.    |
+| `dividends_cache`      | 24 h | Dividend declarations are slow-cadence.            |
 
 Override with `POLYGON_CACHE_BYPASS=1` for a single-call force-fresh.
 
