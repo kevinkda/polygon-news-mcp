@@ -1,0 +1,90 @@
+{
+  "results": [
+    {
+      "id": "msft-news-1",
+      "publisher": {"name": "Reuters", "homepage_url": "https://www.reuters.com/"},
+      "title": "Microsoft beats expectations on cloud growth",
+      "author": "Jane Doe",
+      "published_utc": "2026-05-23T16:00:00Z",
+      "article_url": "https://www.reuters.com/example/msft-cloud-1",
+      "tickers": ["MSFT"],
+      "description": "Microsoft posted strong cloud growth.",
+      "keywords": ["microsoft", "cloud"],
+      "insights": [
+        {"ticker": "MSFT", "sentiment": "positive", "sentiment_reasoning": "Cloud beat"}
+      ]
+    },
+    {
+      "id": "msft-news-2",
+      "publisher": {"name": "Bloomberg"},
+      "title": "Microsoft expands datacenter footprint",
+      "author": "John Smith",
+      "published_utc": "2026-05-22T12:00:00Z",
+      "article_url": "https://www.bloomberg.com/example/msft-dc-1",
+      "tickers": ["MSFT"],
+      "description": "Microsoft is investing in datacenter capacity.",
+      "keywords": ["microsoft", "datacenter"],
+      "insights": [
+        {"ticker": "MSFT", "sentiment": "positive", "sentiment_reasoning": "Capex up"}
+      ]
+    },
+    {
+      "id": "msft-news-3",
+      "publisher": {"name": "CNBC"},
+      "title": "Microsoft faces antitrust scrutiny",
+      "author": "Mary Roe",
+      "published_utc": "2026-05-21T18:30:00Z",
+      "article_url": "https://www.cnbc.com/example/msft-antitrust-1",
+      "tickers": ["MSFT"],
+      "description": "Regulators are reviewing Microsoft's market position.",
+      "keywords": ["microsoft", "antitrust"],
+      "insights": [
+        {"ticker": "MSFT", "sentiment": "negative", "sentiment_reasoning": "Regulatory risk"}
+      ]
+    },
+    {
+      "id": "msft-news-4",
+      "publisher": {"name": "Reuters"},
+      "title": "Microsoft to host annual developer conference",
+      "author": "Bob Brown",
+      "published_utc": "2026-05-20T09:00:00Z",
+      "article_url": "https://www.reuters.com/example/msft-build",
+      "tickers": ["MSFT"],
+      "description": "Annual Build conference dates announced.",
+      "keywords": ["microsoft", "build"],
+      "insights": [
+        {"ticker": "MSFT", "sentiment": "neutral", "sentiment_reasoning": "Routine event"}
+      ]
+    },
+    {
+      "id": "msft-news-5",
+      "publisher": {"name": "WSJ"},
+      "title": "Microsoft hires AI chief from rival",
+      "author": "Carl Cole",
+      "published_utc": "2026-05-19T11:00:00Z",
+      "article_url": "https://www.wsj.com/example/msft-hire",
+      "tickers": ["MSFT", "AAPL"],
+      "description": "High-profile AI executive joins Microsoft.",
+      "keywords": ["microsoft", "ai"],
+      "insights": [
+        {"ticker": "AAPL", "sentiment": "negative", "sentiment_reasoning": "Loses talent"},
+        {"ticker": "MSFT", "sentiment": "positive", "sentiment_reasoning": "Gains talent"}
+      ]
+    },
+    {
+      "id": "msft-news-6",
+      "publisher": "MarketWatch",
+      "title": "Microsoft stock screener mentions",
+      "author": null,
+      "published_utc": "2026-05-18T08:00:00Z",
+      "article_url": "https://www.marketwatch.com/example/msft-screener",
+      "tickers": ["MSFT"],
+      "description": "Routine screener output.",
+      "keywords": ["microsoft"],
+      "insights": []
+    }
+  ],
+  "status": "OK",
+  "request_id": "test-req-news-msft-001",
+  "count": 6
+}

@@ -235,7 +235,7 @@ async def test_get_server_info() -> None:
     out = await get_server_info_impl(server_version="9.9.9")
     assert out["server_version"] == "9.9.9"
     assert "supported_tools" in out
-    assert len(out["supported_tools"]) == 6
+    assert len(out["supported_tools"]) == 8
 
 
 @pytest.mark.asyncio

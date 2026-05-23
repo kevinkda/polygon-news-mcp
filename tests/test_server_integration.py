@@ -20,18 +20,22 @@ from tests.conftest import FIXTURE_DIR, FakeRoute
 def _seed_routes(fixture_dir: Path) -> list[FakeRoute]:
     news_aapl = json.loads((fixture_dir / "news_aapl.json").read_text(encoding="utf-8"))
     news_market = json.loads((fixture_dir / "news_market.json").read_text(encoding="utf-8"))
+    news_msft = json.loads((fixture_dir / "news_msft.json").read_text(encoding="utf-8"))
     details_aapl = json.loads((fixture_dir / "ticker_details_aapl.json").read_text(encoding="utf-8"))
     filings_aapl = json.loads((fixture_dir / "filings_aapl.json").read_text(encoding="utf-8"))
+    dividends_aapl = json.loads((fixture_dir / "dividends_aapl.json").read_text(encoding="utf-8"))
     return [
         FakeRoute("/v2/reference/news?ticker=AAPL", json_body=news_aapl),
+        FakeRoute("/v2/reference/news?ticker=MSFT", json_body=news_msft),
         FakeRoute("/v2/reference/news", json_body=news_market),
         FakeRoute("/v3/reference/tickers/AAPL", json_body=details_aapl),
         FakeRoute("/vX/reference/sec/filings", json_body=filings_aapl),
+        FakeRoute("/v3/reference/dividends", json_body=dividends_aapl),
     ]
 
 
 @pytest.mark.asyncio
-async def test_app_exports_six_tools() -> None:
+async def test_app_exports_eight_tools() -> None:
     a = app()
     tools = await a.list_tools()
     names = {t.name for t in tools}
@@ -40,6 +44,8 @@ async def test_app_exports_six_tools() -> None:
         "get_market_news",
         "get_ticker_details",
         "list_sec_filings_index",
+        "get_news_sentiment_aggregate",
+        "get_dividends",
         "health_check",
         "get_server_info",
     }
@@ -93,6 +99,54 @@ async def test_call_list_sec_filings_index_through_app(make_polygon_client) -> N
 
 
 @pytest.mark.asyncio
+async def test_call_get_dividends_through_app(make_polygon_client) -> None:
+    client = make_polygon_client(_seed_routes(FIXTURE_DIR))
+    await runtime_mod.set_client_for_tests(client)
+    a = app()
+    result = await a.call_tool(
+        "get_dividends",
+        {"ticker": "AAPL", "since_days": 365, "dividend_type": "all"},
+    )
+    payload = _extract_payload(result)
+    assert payload["ticker"] == "AAPL"
+    assert payload["count"] == 4
+
+
+@pytest.mark.asyncio
+async def test_call_get_news_sentiment_aggregate_through_app(make_polygon_client) -> None:
+    client = make_polygon_client(_seed_routes(FIXTURE_DIR))
+    await runtime_mod.set_client_for_tests(client)
+    a = app()
+    result = await a.call_tool(
+        "get_news_sentiment_aggregate",
+        {"ticker": "MSFT", "window_days": 7},
+    )
+    payload = _extract_payload(result)
+    assert payload["ticker"] == "MSFT"
+    assert payload["window_days"] == 7
+    assert payload["total_articles"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_call_get_news_sentiment_aggregate_invalid_window(make_polygon_client) -> None:
+    """``window_days=2`` is not a valid Literal; FastMCP intercepts the
+    Pydantic ``ValidationError`` and re-raises it as ``ToolError`` before
+    our ``_frame_error`` wrapper can run.  We just verify the call
+    surfaces a structured failure rather than letting a raw exception leak.
+    """
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    client = make_polygon_client(_seed_routes(FIXTURE_DIR))
+    await runtime_mod.set_client_for_tests(client)
+    a = app()
+    with pytest.raises(ToolError):
+        await a.call_tool(
+            "get_news_sentiment_aggregate",
+            {"ticker": "MSFT", "window_days": 2},
+        )
+
+
+@pytest.mark.asyncio
 async def test_call_health_check_through_app() -> None:
     a = app()
     result = await a.call_tool("health_check", {})
@@ -106,7 +160,7 @@ async def test_call_get_server_info_through_app() -> None:
     result = await a.call_tool("get_server_info", {})
     payload = _extract_payload(result)
     assert payload["server_version"] == SERVER_VERSION
-    assert len(payload["supported_tools"]) == 6
+    assert len(payload["supported_tools"]) == 8
 
 
 def test_initialize_reports_release_tag_version() -> None:

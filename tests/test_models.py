@@ -7,7 +7,9 @@ from pydantic import ValidationError
 
 from polygon_news_mcp.errors import PolygonValidationError
 from polygon_news_mcp.models import (
+    GetDividendsInput,
     GetMarketNewsInput,
+    GetNewsSentimentAggregateInput,
     GetTickerDetailsInput,
     GetTickerNewsInput,
     ListSecFilingsIndexInput,
@@ -113,9 +115,62 @@ def test_supported_tool_names_stable() -> None:
     assert "get_market_news" in names
     assert "get_ticker_details" in names
     assert "list_sec_filings_index" in names
+    assert "get_news_sentiment_aggregate" in names
+    assert "get_dividends" in names
     assert "health_check" in names
     assert "get_server_info" in names
     assert len(set(names)) == len(names)
+    assert len(names) == 8
+
+
+class TestGetNewsSentimentAggregateInput:
+    def test_default_window(self) -> None:
+        v = GetNewsSentimentAggregateInput(ticker="AAPL")
+        assert v.window_days == 7
+        assert v.ticker == "AAPL"
+
+    def test_uppercase(self) -> None:
+        v = GetNewsSentimentAggregateInput(ticker="msft", window_days=30)
+        assert v.ticker == "MSFT"
+
+    def test_window_must_be_literal(self) -> None:
+        with pytest.raises(ValidationError):
+            GetNewsSentimentAggregateInput(ticker="AAPL", window_days=2)  # type: ignore[arg-type]
+
+    def test_garbage_ticker_rejected(self) -> None:
+        with pytest.raises((ValidationError, PolygonValidationError)):
+            GetNewsSentimentAggregateInput(ticker="bad ticker")
+
+    def test_extra_field_forbidden(self) -> None:
+        with pytest.raises(ValidationError):
+            GetNewsSentimentAggregateInput(ticker="AAPL", bad="x")  # type: ignore[call-arg]
+
+
+class TestGetDividendsInput:
+    def test_default(self) -> None:
+        v = GetDividendsInput(ticker="AAPL")
+        assert v.since_days == 365
+        assert v.dividend_type == "all"
+
+    def test_uppercase(self) -> None:
+        v = GetDividendsInput(ticker="msft")
+        assert v.ticker == "MSFT"
+
+    def test_dividend_type_literal(self) -> None:
+        for kind in ("all", "regular", "special", "unspecified"):
+            GetDividendsInput(ticker="AAPL", dividend_type=kind)  # type: ignore[arg-type]
+        with pytest.raises(ValidationError):
+            GetDividendsInput(ticker="AAPL", dividend_type="weird")  # type: ignore[arg-type]
+
+    def test_since_days_bounds(self) -> None:
+        with pytest.raises(ValidationError):
+            GetDividendsInput(ticker="AAPL", since_days=0)
+        with pytest.raises(ValidationError):
+            GetDividendsInput(ticker="AAPL", since_days=3651)
+
+    def test_garbage_rejected(self) -> None:
+        with pytest.raises((ValidationError, PolygonValidationError)):
+            GetDividendsInput(ticker="bad!")
 
 
 def test_models_are_frozen() -> None:

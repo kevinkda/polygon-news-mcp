@@ -1,0 +1,51 @@
+{
+  "results": [
+    {
+      "ticker": "AAPL",
+      "ex_dividend_date": "2026-05-09",
+      "pay_date": "2026-05-15",
+      "declaration_date": "2026-05-02",
+      "record_date": "2026-05-12",
+      "cash_amount": 0.25,
+      "currency": "USD",
+      "frequency": 4,
+      "dividend_type": "CD"
+    },
+    {
+      "ticker": "AAPL",
+      "ex_dividend_date": "2026-02-08",
+      "pay_date": "2026-02-15",
+      "declaration_date": "2026-02-01",
+      "record_date": "2026-02-12",
+      "cash_amount": 0.24,
+      "currency": "USD",
+      "frequency": 4,
+      "dividend_type": "CD"
+    },
+    {
+      "ticker": "AAPL",
+      "ex_dividend_date": "2025-11-09",
+      "pay_date": "2025-11-15",
+      "declaration_date": "2025-11-02",
+      "record_date": "2025-11-12",
+      "cash_amount": 1.50,
+      "currency": "USD",
+      "frequency": 0,
+      "dividend_type": "SC"
+    },
+    {
+      "ticker": "AAPL",
+      "ex_dividend_date": "2025-08-09",
+      "pay_date": "2025-08-15",
+      "declaration_date": "2025-08-02",
+      "record_date": "2025-08-12",
+      "cash_amount": 0.24,
+      "currency": "USD",
+      "frequency": 4,
+      "dividend_type": ""
+    }
+  ],
+  "status": "OK",
+  "request_id": "test-req-dividends-aapl-001",
+  "count": 4
+}
