@@ -1,0 +1,43 @@
+{
+  "results": [
+    {
+      "id": "mkt-news-1",
+      "publisher": {"name": "CNBC", "homepage_url": "https://www.cnbc.com/"},
+      "title": "Markets close higher on tech rally",
+      "author": "Mary Roe",
+      "published_utc": "2026-05-23T20:00:00Z",
+      "article_url": "https://www.cnbc.com/example/market-rally",
+      "tickers": ["SPY", "QQQ"],
+      "description": "Equity indices closed higher led by mega-cap tech.",
+      "keywords": ["markets", "tech"],
+      "insights": []
+    },
+    {
+      "id": "mkt-news-2",
+      "publisher": {"name": "WSJ"},
+      "title": "Fed signals patience on rate path",
+      "author": "Bob Brown",
+      "published_utc": "2026-05-23T16:15:00Z",
+      "article_url": "https://www.wsj.com/example/fed-patient",
+      "tickers": [],
+      "description": "Fed minutes show willingness to hold rates steady.",
+      "keywords": ["fed", "rates"],
+      "insights": []
+    },
+    {
+      "id": "mkt-news-3",
+      "publisher": "Barron's",
+      "title": "Oil retreats on OPEC+ headlines",
+      "author": "Carl Cole",
+      "published_utc": "2026-05-23T11:45:00Z",
+      "article_url": "https://www.barrons.com/example/oil-retreat",
+      "tickers": ["USO"],
+      "description": "Crude oil futures slid after OPEC+ comments.",
+      "keywords": ["oil", "opec"],
+      "insights": []
+    }
+  ],
+  "status": "OK",
+  "request_id": "test-req-market-001",
+  "count": 3
+}

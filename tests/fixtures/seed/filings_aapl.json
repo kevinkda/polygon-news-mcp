@@ -1,0 +1,33 @@
+{
+  "results": [
+    {
+      "accession_number": "0000320193-26-000005",
+      "form_type": "10-Q",
+      "filed_date": "2026-05-01",
+      "period_of_report": "2026-03-31",
+      "company_name": "Apple Inc.",
+      "ticker": "AAPL",
+      "cik": "0000320193",
+      "sentiment": "positive",
+      "category": "earnings",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/0000320193-26-000005-index.htm",
+      "primary_document_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/aapl-20260331.htm"
+    },
+    {
+      "accession_number": "0000320193-26-000004",
+      "form_type": "8-K",
+      "filed_date": "2026-04-15",
+      "period_of_report": "2026-04-15",
+      "company_name": "Apple Inc.",
+      "ticker": "AAPL",
+      "cik": "0000320193",
+      "sentiment": "neutral",
+      "category": "corporate-event",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000004/0000320193-26-000004-index.htm",
+      "primary_document_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000004/event.htm"
+    }
+  ],
+  "status": "OK",
+  "request_id": "test-req-filings-aapl-001",
+  "count": 2
+}

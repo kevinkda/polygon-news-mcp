@@ -1,0 +1,38 @@
+{
+  "results": {
+    "ticker": "AAPL",
+    "name": "Apple Inc.",
+    "market": "stocks",
+    "locale": "us",
+    "primary_exchange": "XNAS",
+    "type": "CS",
+    "active": true,
+    "currency_name": "usd",
+    "cik": "0000320193",
+    "composite_figi": "BBG000B9XRY4",
+    "share_class_figi": "BBG001S5N8V8",
+    "market_cap": 3000000000000,
+    "phone_number": "(408) 996-1010",
+    "address": {
+      "address1": "ONE APPLE PARK WAY",
+      "city": "CUPERTINO",
+      "state": "CA",
+      "postal_code": "95014"
+    },
+    "description": "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.",
+    "sic_code": "3571",
+    "sic_description": "ELECTRONIC COMPUTERS",
+    "homepage_url": "https://www.apple.com",
+    "total_employees": 161000,
+    "list_date": "1980-12-12",
+    "share_class_shares_outstanding": 15500000000,
+    "weighted_shares_outstanding": 15500000000,
+    "round_lot": 100,
+    "branding": {
+      "logo_url": "https://api.polygon.io/v1/reference/company-branding/d3d3LmFwcGxlLmNvbQ/images/2024-01-01_logo.svg",
+      "icon_url": "https://api.polygon.io/v1/reference/company-branding/d3d3LmFwcGxlLmNvbQ/images/2024-01-01_icon.png"
+    }
+  },
+  "status": "OK",
+  "request_id": "test-req-details-aapl-001"
+}

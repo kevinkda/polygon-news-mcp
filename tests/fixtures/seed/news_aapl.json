@@ -1,0 +1,52 @@
+{
+  "results": [
+    {
+      "id": "abc123-aapl-news-1",
+      "publisher": {
+        "name": "Reuters",
+        "homepage_url": "https://www.reuters.com/",
+        "logo_url": "https://example.com/reuters.svg",
+        "favicon_url": "https://example.com/reuters.ico"
+      },
+      "title": "Apple unveils new iPhone with AI features",
+      "author": "Jane Doe",
+      "published_utc": "2026-05-23T14:30:00Z",
+      "article_url": "https://www.reuters.com/example/aapl-iphone-ai",
+      "tickers": ["AAPL"],
+      "image_url": "https://example.com/aapl-1.jpg",
+      "description": "Apple announced its latest iPhone today with on-device AI capabilities.",
+      "keywords": ["apple", "iphone", "ai"],
+      "insights": [
+        {
+          "ticker": "AAPL",
+          "sentiment": "positive",
+          "sentiment_reasoning": "New product launch with AI differentiation."
+        }
+      ]
+    },
+    {
+      "id": "abc124-aapl-news-2",
+      "publisher": {
+        "name": "Bloomberg",
+        "homepage_url": "https://www.bloomberg.com/"
+      },
+      "title": "Apple supply chain expanding in Vietnam",
+      "author": "John Smith",
+      "published_utc": "2026-05-22T09:00:00Z",
+      "article_url": "https://www.bloomberg.com/example/aapl-vietnam",
+      "tickers": ["AAPL"],
+      "description": "Apple is increasing manufacturing capacity in Vietnam.",
+      "keywords": ["apple", "supply-chain"],
+      "insights": [
+        {
+          "ticker": "AAPL",
+          "sentiment": "neutral",
+          "sentiment_reasoning": "Supply chain diversification continues."
+        }
+      ]
+    }
+  ],
+  "status": "OK",
+  "request_id": "test-req-news-aapl-001",
+  "count": 2
+}
