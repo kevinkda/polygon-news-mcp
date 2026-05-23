@@ -3,7 +3,7 @@
 [English](./README.md) | [简体中文](./README_zh.md)
 
 只读 **Model Context Protocol (MCP)** 服务器，将
-[Polygon.io](https://polygon.io/) 公开 API 包装为 **7 个工具**
+[Polygon.io](https://polygon.io/) 公开 API 包装为 **6 个工具**
 （5 业务 + 2 meta），可在 Cursor、Claude Code 以及任意 MCP 客户端中使用。
 
 > **只读** —— 每个工具只对 `https://api.polygon.io/` 发起 HTTPS GET，不会回写。
@@ -68,7 +68,7 @@ uv run polygon-news-mcp        # 在 stdio 上启动 MCP 服务器
 
 ## 工具清单
 
-服务器对外暴露 **7 个工具**：5 业务 + 2 meta。
+服务器对外暴露 **6 个工具**：4 业务 + 2 meta。
 
 | Tool | 何时用 | 入参 | 缓存 TTL |
 | --- | --- | --- | --- |

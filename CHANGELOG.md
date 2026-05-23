@@ -13,7 +13,7 @@ Initial scaffold.
 
 ### Added
 
-- 5 read-only MCP tools wrapping the Polygon.io public API:
+- 6 read-only MCP tools wrapping the Polygon.io public API:
   - `get_ticker_news(ticker, limit=10, since_days=7)`
   - `get_market_news(limit=20, since_hours=24)`
   - `get_ticker_details(ticker)`

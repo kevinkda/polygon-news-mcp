@@ -7,8 +7,8 @@
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 
 Read-only **Model Context Protocol (MCP)** server that wraps the
-[Polygon.io](https://polygon.io/) public API as **7 tools**
-(5 business + 2 meta) for use inside Cursor, Claude Code, and any
+[Polygon.io](https://polygon.io/) public API as **6 tools**
+(4 business + 2 meta) for use inside Cursor, Claude Code, and any
 MCP-aware agent.
 
 > **Read-only** — every tool issues plain HTTPS GETs against
@@ -78,7 +78,7 @@ Register the server with Cursor / Claude Desktop — see
 
 ## Tooling surface
 
-The server exposes **7 tools**: 5 business + 2 meta.
+The server exposes **6 tools**: 4 business + 2 meta.
 
 ### `get_ticker_news`
 
