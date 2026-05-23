@@ -171,6 +171,13 @@ exclude = ["build/", "dist/", ".venv/", "htmlcov/"]
 module = ["mcp.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# plyer is an optional Windows-only dep used inside _platform._notify_windows
+# (guarded by sys.platform == "win32" + try/except).  Linux/macOS CI runners
+# do not install it; ignore the missing stub there.
+module = ["plyer"]
+ignore_missing_imports = true
+
 # ---------------------------------------------------------------------------
 # bandit
 # ---------------------------------------------------------------------------

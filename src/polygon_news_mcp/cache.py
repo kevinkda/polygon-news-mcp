@@ -21,7 +21,6 @@ import hashlib
 import json
 import logging
 import os
-import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -30,6 +29,8 @@ from pathlib import Path
 from typing import Any, Final
 
 import duckdb
+
+from . import _platform
 
 log = logging.getLogger(__name__)
 
@@ -46,8 +47,6 @@ CACHE_DIR_NAME: Final[str] = "polygon-news-mcp"
 
 ENV_CACHE_ENABLED: Final[str] = "POLYGON_CACHE_ENABLED"
 ENV_CACHE_BYPASS: Final[str] = "POLYGON_CACHE_BYPASS"
-
-IS_WINDOWS: Final[bool] = sys.platform == "win32"
 
 
 def _truthy(raw: str | None, *, default: bool) -> bool:
@@ -67,16 +66,12 @@ def cache_bypass() -> bool:
 
 
 def state_root() -> Path:
-    """Cross-platform state-directory root."""
-    raw = os.environ.get("XDG_STATE_HOME")
-    if raw:
-        return Path(raw).expanduser()
-    if IS_WINDOWS:  # pragma: no cover - windows-only branch
-        local_app = os.environ.get("LOCALAPPDATA")
-        if local_app:
-            return Path(local_app)
-        return Path.home() / "AppData" / "Local"
-    return Path.home() / ".local" / "state"
+    """Cross-platform state-directory root.
+
+    Thin re-export of :func:`polygon_news_mcp._platform.state_root` kept for
+    backwards compatibility with existing call sites (``server.py`` etc).
+    """
+    return _platform.state_root()
 
 
 def default_db_path() -> Path:
@@ -85,11 +80,11 @@ def default_db_path() -> Path:
 
 
 def _secure_chmod(path: Path, mode: int) -> None:
-    if IS_WINDOWS:  # pragma: no cover - windows-only branch
-        return
     try:
-        os.chmod(path, mode)
+        _platform.secure_chmod(path, mode)
     except OSError:
+        # secure_chmod is itself best-effort, but os.chmod can still raise
+        # under POSIX (read-only FS, missing path race, etc.).  Swallow.
         pass
 
 
@@ -241,14 +236,11 @@ class Cache:
 
     def _ensure_parent(self) -> None:
         parent = self.db_path.parent
-        if IS_WINDOWS:  # pragma: no cover - windows-only branch
+        if _platform.IS_WINDOWS:  # pragma: no cover - windows-only branch
             parent.mkdir(parents=True, exist_ok=True)
             return
-        old = os.umask(0o077)
-        try:
+        with _platform.restrictive_umask():
             parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-        finally:
-            os.umask(old)
 
     def _open(self) -> None:
         try:
