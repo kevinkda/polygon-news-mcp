@@ -1,6 +1,6 @@
 [project]
 name = "polygon-news-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Read-only MCP server for Polygon.io news, ticker details, and SEC filings index."
 readme = "README.md"
 requires-python = ">=3.11"
