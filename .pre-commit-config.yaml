@@ -99,7 +99,13 @@ repos:
         stages: [pre-commit]
 
   # ---------------------------------------------------------------------
-  # Markdown lint
+  # Markdown lint — gated to `stages: [manual]` because the `npx --yes
+  # markdownlint-cli2` invocation hangs/times out on locked-down corporate
+  # networks where npx must reach the public registry on first run.  This is
+  # the same offline-network constraint that gates gitleaks to manual.  CI
+  # (public network) still runs markdownlint via the reusable workflow.
+  # Run locally from a machine with public internet via:
+  #     pre-commit run --hook-stage manual markdownlint-cli2 --all-files
   # ---------------------------------------------------------------------
   - repo: local
     hooks:
@@ -109,3 +115,4 @@ repos:
         language: system
         types: [markdown]
         require_serial: true
+        stages: [manual]

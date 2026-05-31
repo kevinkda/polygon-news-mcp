@@ -532,7 +532,7 @@ def get_cache() -> Cache | None:
     if _singleton is not None:
         return _singleton
     with _singleton_lock:
-        if _singleton is None:
+        if _singleton is None:  # pragma: no branch - double-checked lock; race side not deterministically testable
             _singleton = Cache()
     return _singleton
 

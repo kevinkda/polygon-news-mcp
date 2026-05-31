@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-31
+
+### Added
+
+- **Test campaign batch 3 — 100% coverage + full security suite (from
+  zero).** Raised line+branch coverage from 88.58% to **100.00%** (363
+  tests, up from 193) and built the complete security test matrix
+  mirroring the batch-1 schwab-positions-mcp template. polygon-news-mcp
+  previously had **no security tests**; this release establishes the
+  baseline:
+  - `tests/test_coverage_completion.py` — drives every residual
+    `file:line` branch to 100% (server error-framing + per-tool except
+    branches, stdio-harden OSError paths, `_runtime` cache lookup/store
+    exceptions, meta api-key/cache branches, cache DuckDB-error
+    resilience + quarantine, client JSON-shape + `_abs_url`
+    normalisation, news/filings/sentiment non-dict-entry skips).
+  - `tests/test_owasp_2017.py`, `tests/test_owasp_2021.py`,
+    `tests/test_owasp_2025.py` — OWASP Top 10 across all three editions.
+    The centrepiece is **`POLYGON_API_KEY` confidentiality**: the key is
+    asserted absent from error envelopes, exception `repr`/`str`, logs,
+    cache payloads, and tool responses (`redact_secret` strips both
+    `?apiKey=` query strings and `Bearer` tokens). **N/A categories are
+    explicitly documented with source-drift guards**: A4 XXE (Polygon is
+    a JSON-only API — no XML parser imported) and A7:2017 XSS (no HTML
+    surface).
+  - `tests/test_pentest.py` — active attacker simulation: SSRF via
+    ticker, SQL/command injection, **API-key exfiltration** (error repr,
+    framed envelope, cache payload), resource exhaustion, free-tier
+    rate-limit evasion, and info-leak guards.
+  - `tests/test_exception.py` — exception type guards, HTTP-layer error
+    mapping (401/403/404/invalid-JSON/5xx), cache best-effort
+    resilience, and API-key/PII scrubbing.
+  - `tests/test_boundary.py` — boundary-value sweeps for every numeric
+    and string input (limit, since_days, since_hours, ticker length,
+    dividend_type / window_days literals, extra-field rejection).
+
+### Changed
+
+- CI coverage gate (`tool.coverage.report.fail_under`) raised from 85 to
+  **100**.
+- `markdownlint-cli2` pre-commit hook gated to `stages: [manual]` (aligns
+  with gitleaks) because the `npx --yes` invocation times out on
+  locked-down corporate networks; CI still runs markdownlint on the
+  public-network reusable workflow.
+- Three `# pragma: no cover` / `# pragma: no branch` annotations added to
+  provably-unreachable defensive branches (token-bucket `wait<=0`
+  continue, double-checked-lock race sides, the `resolve_api_key`
+  config-error path that only fires on an empty key already guarded
+  upstream) with documented rationale.
+
 ## [0.2.0] - 2026-05-24
 
 ### Added
