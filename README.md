@@ -35,7 +35,8 @@ the gap that Schwab's market-data feed leaves open: **news**, ticker
 
 All three repos share the same hardening discipline:
 
-- DuckDB-backed local cache (1 h news / 24 h ticker details / 6 h filings).
+- DuckDB-backed local cache (1 h news / 24 h ticker details / 6 h filings) —
+  **disabled by default (opt-in)**; enable with `POLYGON_CACHE_ENABLED=true`.
 - httpx async client with token-bucket rate limit (free tier: 5 req/min).
 - Pydantic v2 input validation (anchored ticker regex).
 - Stdio hardening so log lines never corrupt the JSON-RPC stream.
@@ -212,7 +213,11 @@ Never calls Polygon.
 | `filings_index_cache`  | 6 h  | Filings are filed throughout each business day.    |
 | `dividends_cache`      | 24 h | Dividend declarations are slow-cadence.            |
 
-Override with `POLYGON_CACHE_BYPASS=1` for a single-call force-fresh.
+The cache is **disabled by default (opt-in)** — no DuckDB file is created and
+every tool hits Polygon live, reporting `_cache_status: "disabled"`. Enable it
+explicitly with `POLYGON_CACHE_ENABLED=true` (also accepts `1` / `yes` / `on`).
+Once enabled, override with `POLYGON_CACHE_BYPASS=1` for a single-call
+force-fresh.
 
 ---
 

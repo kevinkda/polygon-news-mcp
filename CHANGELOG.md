@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-10
+
+### Changed
+
+- ⚠️ **BREAKING: DuckDB cache is now opt-in (default DISABLED).**
+  `cache_enabled()` flips its default from `True` to `False`, so an
+  unset `POLYGON_CACHE_ENABLED` now yields **no cache** — no DuckDB file
+  is created and every tool hits Polygon live, reporting
+  `_cache_status: "disabled"`. Re-enable explicitly with
+  `POLYGON_CACHE_ENABLED=true` (also accepts `1` / `yes` / `on`, case- and
+  whitespace-insensitive). This zeroes the default on-disk footprint and
+  removes implicit persistent state for fresh installs and CI. Tests,
+  `.env.example`, `README.md`, and `README_zh.md` updated; 100% coverage
+  preserved (truthy/falsy matrix + unset→`get_cache()` None gate added).
+
 ## [0.2.1] - 2026-05-31
 
 ### Added

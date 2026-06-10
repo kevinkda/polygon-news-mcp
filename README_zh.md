@@ -31,7 +31,9 @@ Schwab 行情接口缺失的能力：**新闻 / 标的元数据 / 带情绪的 S
 三个仓库共享同一套硬化纪律：
 
 - DuckDB 本地缓存（news 1 h；ticker_details 24 h；filings_index 6 h；
-  dividends 24 h）。
+  dividends 24 h）——**默认关闭（需显式开启）**，不创建 DuckDB 文件、每次工具
+  调用都实时打 Polygon（返回 `_cache_status: "disabled"`）；通过
+  `POLYGON_CACHE_ENABLED=true`（也接受 `1` / `yes` / `on`）显式启用。
 - httpx 异步客户端 + 令牌桶限速（免费档：5 req/min）。
 - Pydantic v2 入参校验（ticker 正则锚定）。
 - stdio 加固，日志永远不会污染 JSON-RPC 流。

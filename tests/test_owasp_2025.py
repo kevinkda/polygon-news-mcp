@@ -141,7 +141,7 @@ class TestReassertedInvariants:
 
         monkeypatch.delenv("POLYGON_CACHE_ENABLED", raising=False)
         monkeypatch.delenv("POLYGON_CACHE_BYPASS", raising=False)
-        assert cache_enabled() and not cache_bypass()
+        assert not cache_enabled() and not cache_bypass()
 
     def test_a06_deps_declared(self) -> None:
         body = (REPO_ROOT / "pyproject.toml").read_text("utf-8")
