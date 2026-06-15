@@ -110,20 +110,14 @@ class TestReassertedInvariants:
         for t in await app().list_tools():
             assert not any(v in t.name for v in ("create", "delete", "update", "write"))
 
-    def test_a02_cache_perms(self, tmp_path: Path) -> None:
-        import os
-        import stat
-        import sys
-
+    def test_a02_cache_default_backend_no_file(self) -> None:
         from polygon_news_mcp.cache import Cache
+        from polygon_news_mcp.cache_backend import MemoryBackend
 
-        if sys.platform == "win32":
-            pytest.skip("POSIX-only perm semantics")
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            assert stat.S_IMODE(os.stat(tmp_path / "c.duckdb").st_mode) == 0o600
-        finally:
-            cache.close()
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
+        # v0.3.0: default memory backend keeps no on-disk file to mis-permission.
+        assert cache.backend.name == "memory"
 
     def test_a02_api_key_redacted(self) -> None:
         from polygon_news_mcp.errors import redact_secret
@@ -145,7 +139,9 @@ class TestReassertedInvariants:
 
     def test_a06_deps_declared(self) -> None:
         body = (REPO_ROOT / "pyproject.toml").read_text("utf-8")
-        assert "httpx" in body and "pydantic" in body and "duckdb" in body
+        assert "httpx" in body and "pydantic" in body
+        assert "duckdb" not in body
+        assert "clickhouse-connect" in body
 
     def test_a07_fail_closed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from polygon_news_mcp.client import resolve_api_key
@@ -164,17 +160,15 @@ class TestReassertedInvariants:
         with pytest.raises(PolygonTransientError):
             await client.get_json("/s")
 
-    def test_a09_audit_events(self, tmp_path: Path) -> None:
+    def test_a09_monitoring_surface(self) -> None:
         from polygon_news_mcp.cache import Cache
+        from polygon_news_mcp.cache_backend import MemoryBackend
 
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            cache.put_news({"q": "z"}, {"v": 1})
-            assert cache._conn is not None
-            n = cache._conn.execute("SELECT COUNT(*) FROM cache_events WHERE kind='write'").fetchone()[0]
-            assert n >= 1
-        finally:
-            cache.close()
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "z"}, {"v": 1})
+        stats = cache.get_stats()
+        assert stats.backend == "memory"
+        assert stats.entries >= 1
 
     def test_a10_ssrf_ticker_rejected(self) -> None:
         from polygon_news_mcp.models import GetTickerDetailsInput

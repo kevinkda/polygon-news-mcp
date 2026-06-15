@@ -24,14 +24,12 @@ Applicability map (2017):
 
 from __future__ import annotations
 
-import os
-import stat
-import sys
 from pathlib import Path
 
 import pytest
 
 from polygon_news_mcp.cache import Cache
+from polygon_news_mcp.cache_backend import MemoryBackend
 from polygon_news_mcp.errors import redact_secret
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -57,14 +55,13 @@ FAKE_KEY = "AbCdEf0123456789XyZ_secretkey"  # pragma: allowlist secret
 
 
 class TestA1Injection:
-    def test_duckdb_writes_use_bound_params(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            payload = "x'); DROP TABLE news_cache;--"
-            cache.put_news({"q": payload}, {"echo": payload})
-            assert cache.get_news({"q": payload}) == {"echo": payload}
-        finally:
-            cache.close()
+    def test_cache_keys_isolate_injection_payload(self) -> None:
+        """v0.3.0: no SQL surface remains; payloads round-trip as opaque data
+        through the params-hash key (no string interpolation into a query)."""
+        cache = Cache(backend=MemoryBackend())
+        payload = "x'); DROP TABLE news_cache;--"
+        cache.put_news({"q": payload}, {"echo": payload})
+        assert cache.get_news({"q": payload}) == {"echo": payload}
 
     def test_ticker_regex_rejects_injection_chars(self) -> None:
         from polygon_news_mcp.models import GetTickerNewsInput
@@ -225,16 +222,13 @@ class TestA5AccessControl:
 
 
 class TestA6Misconfiguration:
-    def test_cache_db_owner_only_on_posix(self, tmp_path: Path) -> None:
-        if sys.platform == "win32":
-            pytest.skip("POSIX-only perm semantics")
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            mode = stat.S_IMODE(os.stat(tmp_path / "c.duckdb").st_mode)
-            assert mode == 0o600
-            assert not (mode & stat.S_IRGRP) and not (mode & stat.S_IROTH)
-        finally:
-            cache.close()
+    def test_cache_default_backend_writes_no_file(self) -> None:
+        """v0.3.0: the default memory backend keeps state in-process — no
+        on-disk cache file to mis-permission (the old DuckDB file is gone)."""
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
+        assert cache.backend.name == "memory"
+        assert cache.get_news({"q": "x"}) == {"data": 1}
 
     def test_api_key_enforced(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from polygon_news_mcp.client import resolve_api_key
@@ -277,13 +271,13 @@ class TestA8Deserialization:
         with pytest.raises(PolygonTransientError):
             await client.get_json("/scalar")
 
-    def test_cache_deserialise_rejects_non_dict(self) -> None:
-        from polygon_news_mcp.cache import _deserialise
-
-        assert _deserialise("[1,2,3]") is None
-        assert _deserialise("not json") is None
-        assert _deserialise(None) is None
-        assert _deserialise('{"ok": 1}') == {"ok": 1}
+    def test_cache_payload_round_trips_only_dicts(self) -> None:
+        """v0.3.0: the memory backend stores dict payloads verbatim and never
+        returns deserialised non-dict garbage (no JSON-string round-trip)."""
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"ok": 1})
+        assert cache.get_news({"q": "x"}) == {"ok": 1}
+        assert cache.get_news({"q": "missing"}) is None
 
 
 # ===========================================================================
@@ -294,7 +288,10 @@ class TestA8Deserialization:
 class TestA9VulnerableComponents:
     def test_security_deps_pinned(self) -> None:
         body = (REPO_ROOT / "pyproject.toml").read_text("utf-8")
-        assert "httpx" in body and "pydantic" in body and "duckdb" in body
+        assert "httpx" in body and "pydantic" in body
+        # v0.3.0: duckdb removed; clickhouse is an opt-in extra only.
+        assert "duckdb" not in body
+        assert "clickhouse-connect" in body
 
 
 # ===========================================================================
@@ -303,17 +300,16 @@ class TestA9VulnerableComponents:
 
 
 class TestA10Logging:
-    def test_cache_events_audit_trail(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            cache.put_news({"q": "x"}, {"data": 1})
-            cache.get_news({"q": "x"})  # hit
-            cache.get_news({"q": "y"})  # miss
-            assert cache._conn is not None
-            kinds = {r[0] for r in cache._conn.execute("SELECT DISTINCT kind FROM cache_events").fetchall()}
-            assert {"write", "hit", "miss"} <= kinds
-        finally:
-            cache.close()
+    def test_cache_stats_expose_monitoring_surface(self) -> None:
+        """v0.3.0: the cache exposes a monitoring surface (backend + live entry
+        count) in lieu of the removed DuckDB cache_events audit table."""
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
+        cache.get_news({"q": "x"})  # hit
+        cache.get_news({"q": "y"})  # miss
+        stats = cache.get_stats().to_dict()
+        assert stats["backend"] == "memory"
+        assert stats["entries"] >= 1
 
     def test_server_log_is_structured_json(self) -> None:
         body = (SRC_ROOT / "server.py").read_text("utf-8")

@@ -1,6 +1,6 @@
 [project]
 name = "polygon-news-mcp"
-version = "0.2.2"
+version = "0.3.0"
 description = "Read-only MCP server for Polygon.io news, ticker details, and SEC filings index."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,10 +25,10 @@ dependencies = [
     "httpx>=0.28.1,<0.29",
     "pydantic>=2.6,<3",
     "python-dotenv>=1.0,<2",
-    "duckdb>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
+clickhouse = ["clickhouse-connect>=0.7,<1"]
 dev = [
     "pytest>=9.0.3,<10",
     "pytest-asyncio>=0.23,<2",
@@ -172,7 +172,7 @@ show_error_codes = true
 exclude = ["build/", "dist/", ".venv/", "htmlcov/"]
 
 [[tool.mypy.overrides]]
-module = ["mcp.*"]
+module = ["mcp.*", "clickhouse_connect.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

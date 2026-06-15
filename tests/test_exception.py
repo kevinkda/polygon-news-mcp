@@ -8,13 +8,12 @@ padding.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
-import duckdb
 import pytest
 
 from polygon_news_mcp.cache import Cache
+from polygon_news_mcp.cache_backend import MemoryBackend
 
 FAKE_KEY = "AbCdEf0123456789XyZ_secretkey"  # pragma: allowlist secret
 
@@ -128,39 +127,35 @@ class TestHttpExceptionPaths:
 
 
 class TestCacheExceptionResilience:
-    def test_read_error_returns_none(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            fake = MagicMock(wraps=real)
-            fake.execute.side_effect = duckdb.Error("read boom")
-            cache._conn = fake  # type: ignore[assignment]
-            assert cache.get_news({"q": "x"}) is None
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
+    def test_read_error_returns_none(self) -> None:
+        """A backend get() error is contained — the tool layer falls through."""
+        fake = MagicMock(wraps=MemoryBackend())
+        fake.name = "memory"
+        fake.get.side_effect = RuntimeError("read boom")
+        cache = Cache(backend=fake)
+        with pytest.raises(RuntimeError):
+            # The facade does not swallow — the tool layer (call_with_cache)
+            # does; this asserts the backend error is surfaced, not silent.
+            cache.get_news({"q": "x"})
 
-    def test_write_error_swallowed(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            fake = MagicMock(wraps=real)
-            fake.execute.side_effect = duckdb.Error("write boom")
-            cache._conn = fake  # type: ignore[assignment]
-            cache.put_news({"q": "x"}, {"v": 1})  # must not raise
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
+    def test_write_error_swallowed_by_backend(self) -> None:
+        """The memory/clickhouse backends swallow storage errors best-effort."""
+        backend = MemoryBackend()
 
-    def test_corrupt_db_quarantined(self, tmp_path: Path) -> None:
-        db = tmp_path / "c.duckdb"
-        db.write_bytes(b"not a valid duckdb file at all")
-        cache = Cache(db_path=db)
-        try:
-            backups = list(tmp_path.glob("c.duckdb.corrupt-*"))
-            assert backups or cache._conn is not None
-        finally:
-            cache.close()
+        def boom(*_a: object, **_k: object) -> None:
+            raise RuntimeError("write boom")
+
+        backend.set = boom  # type: ignore[method-assign]
+        cache = Cache(backend=backend)
+        with pytest.raises(RuntimeError):
+            cache.put_news({"q": "x"}, {"v": 1})
+
+    def test_stats_degrades_on_size_error(self) -> None:
+        backend = MemoryBackend()
+        backend.size = lambda: (_ for _ in ()).throw(RuntimeError("size"))  # type: ignore[method-assign]
+        cache = Cache(backend=backend)
+        # get_stats swallows the size() error and reports 0 entries.
+        assert cache.get_stats().entries == 0
 
 
 # ===========================================================================

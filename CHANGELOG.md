@@ -7,7 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.2] - 2026-06-10
+## [0.3.0] - 2026-06-15
+
+### Changed
+
+- ⚠️ **BREAKING: the embedded DuckDB cache is removed and replaced by a
+  pluggable cache backend (v0.7 T0).** The cache now delegates to a
+  `CacheBackend` selected via `POLYGON_CACHE_BACKEND`:
+  - **memory** (default) — in-process LRU + per-entry TTL built on stdlib
+    `OrderedDict` + a short-held `threading.Lock` that only ever wraps dict
+    mutations (never I/O). Zero external dependency, concurrency-safe, and
+    non-blocking — it removes the old single-connection DuckDB + global
+    `RLock` that could serialise the asyncio event loop, plus all on-disk
+    cache files, file locks, and the corrupt-DB quarantine machinery.
+  - **clickhouse** (opt-in) — `pip install polygon-news-mcp[clickhouse]`
+    + `POLYGON_CLICKHOUSE_URL` + `POLYGON_CACHE_BACKEND=clickhouse` for
+    durable derived-analysis history (`append_timeseries` /
+    `query_timeseries`). `clickhouse_connect` is imported lazily, so a
+    default install never pays for it; a missing extra raises a friendly
+    `ClickHouseNotInstalledError`.
+- **Removed the `duckdb` runtime dependency.** ClickHouse is an opt-in
+  `[clickhouse]` extra only; the default install ships with **zero new
+  dependencies** and works out of the box.
+- **Graceful degradation without ClickHouse.** Derived-analysis time-series
+  calls on the memory backend return a structured
+  `{"status": "requires_clickhouse_persistence", "hint": ...}` signal
+  instead of raising — core tools (news / ticker details / filings index /
+  dividends) see zero behavioural change.
+- **`get_cache_stats` / `health_check` fields changed.** The DuckDB-specific
+  `db_path` / `size_mb` / `rows_per_table` / `expired_rows` / `hit_rate_24h`
+  / `hits_24h` / `misses_24h` fields are replaced by `backend` (the active
+  backend name) and `entries` (live response-cache entry count).
+- The per-table public cache API (`get_news` / `put_news` /
+  `get_ticker_details` / `get_filings_index` / `get_dividends` …) is
+  unchanged, so all tools and their behaviour are unaffected. 100%
+  line+branch coverage preserved (memory concurrency/LRU/TTL, ClickHouse via
+  a mocked client, degradation, and factory fallback paths).
+
+
 
 ### Changed
 

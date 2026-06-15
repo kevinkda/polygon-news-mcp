@@ -35,8 +35,10 @@ the gap that Schwab's market-data feed leaves open: **news**, ticker
 
 All three repos share the same hardening discipline:
 
-- DuckDB-backed local cache (1 h news / 24 h ticker details / 6 h filings) —
+- Pluggable response cache (1 h news / 24 h ticker details / 6 h filings) —
   **disabled by default (opt-in)**; enable with `POLYGON_CACHE_ENABLED=true`.
+  Default backend is in-process **memory** (zero dependency); an opt-in
+  **ClickHouse** backend (`[clickhouse]` extra) adds durable history.
 - httpx async client with token-bucket rate limit (free tier: 5 req/min).
 - Pydantic v2 input validation (anchored ticker regex).
 - Stdio hardening so log lines never corrupt the JSON-RPC stream.
@@ -213,11 +215,25 @@ Never calls Polygon.
 | `filings_index_cache`  | 6 h  | Filings are filed throughout each business day.    |
 | `dividends_cache`      | 24 h | Dividend declarations are slow-cadence.            |
 
-The cache is **disabled by default (opt-in)** — no DuckDB file is created and
-every tool hits Polygon live, reporting `_cache_status: "disabled"`. Enable it
-explicitly with `POLYGON_CACHE_ENABLED=true` (also accepts `1` / `yes` / `on`).
-Once enabled, override with `POLYGON_CACHE_BYPASS=1` for a single-call
-force-fresh.
+The cache is **disabled by default (opt-in)** — every tool hits Polygon live,
+reporting `_cache_status: "disabled"`. Enable it explicitly with
+`POLYGON_CACHE_ENABLED=true` (also accepts `1` / `yes` / `on`). Once enabled,
+override with `POLYGON_CACHE_BYPASS=1` for a single-call force-fresh.
+
+### Cache backend (v0.3.0)
+
+⚠️ **BREAKING (v0.3.0):** the embedded DuckDB cache is removed in favour of a
+pluggable backend selected via `POLYGON_CACHE_BACKEND`:
+
+| Backend | Default | Dependency | Notes |
+| --- | --- | --- | --- |
+| `memory` | ✅ | none (stdlib) | In-process LRU + TTL, concurrency-safe, non-blocking, no files. |
+| `clickhouse` | — | `pip install polygon-news-mcp[clickhouse]` + `POLYGON_CLICKHOUSE_URL` | Durable derived-analysis history. |
+
+Without ClickHouse, derived-analysis history degrades to a
+`requires_clickhouse_persistence` signal; the four core tools are unaffected.
+`get_cache_stats` / `health_check` now report `backend` + `entries` (the old
+DuckDB `db_path` / `size_mb` / `hit_rate_24h` fields are gone).
 
 ---
 

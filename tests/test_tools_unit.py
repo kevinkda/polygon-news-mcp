@@ -239,10 +239,16 @@ async def test_get_server_info() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_cache_stats_enabled() -> None:
+async def test_get_cache_stats_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    import polygon_news_mcp.cache as cache_mod
+
+    monkeypatch.setenv("POLYGON_CACHE_ENABLED", "1")
+    monkeypatch.delenv("POLYGON_CACHE_BACKEND", raising=False)
+    cache_mod.reset_cache_singleton()
     out = await get_cache_stats_impl()
-    assert "rows_per_table" in out
-    assert "hit_rate_24h" in out
+    assert out["backend"] == "memory"
+    assert "entries" in out
+    cache_mod.reset_cache_singleton()
 
 
 @pytest.mark.asyncio

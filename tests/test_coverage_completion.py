@@ -23,11 +23,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-import duckdb
 import pytest
 
 import polygon_news_mcp.tools._runtime as runtime_mod
 from polygon_news_mcp.cache import Cache
+from polygon_news_mcp.cache_backend import MemoryBackend
 
 
 def _extract_payload(result: Any) -> dict[str, Any]:
@@ -251,7 +251,7 @@ class TestMetaGaps:
         from polygon_news_mcp.tools import meta
 
         monkeypatch.setattr(meta, "cache_enabled", lambda: False)
-        assert meta._safe_cache_summary() == {"enabled": False, "size_mb": 0.0, "hit_rate_24h": None}
+        assert meta._safe_cache_summary() == {"enabled": False, "backend": None, "entries": 0}
 
     def test_cache_summary_get_cache_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from polygon_news_mcp.tools import meta
@@ -264,10 +264,10 @@ class TestMetaGaps:
         from polygon_news_mcp.tools import meta
 
         broken = MagicMock()
-        broken.get_stats.side_effect = RuntimeError("duckdb gone")
+        broken.get_stats.side_effect = RuntimeError("backend gone")
         monkeypatch.setattr(meta, "cache_enabled", lambda: True)
         monkeypatch.setattr(meta, "get_cache", lambda: broken)
-        assert meta._safe_cache_summary() == {"enabled": True, "size_mb": 0.0, "hit_rate_24h": None}
+        assert meta._safe_cache_summary() == {"enabled": True, "backend": None, "entries": 0}
 
 
 # ===========================================================================
@@ -399,241 +399,57 @@ class TestToolEntrySkips:
 
 
 class TestCacheGaps:
-    def test_get_json_row_duckdb_error_returns_none(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            fake = MagicMock(wraps=real)
-            fake.execute.side_effect = duckdb.Error("read fail")
-            cache._conn = fake  # type: ignore[assignment]
-            assert cache._get_json_row("news_cache", "k") is None
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
+    def test_get_delegates_to_backend(self) -> None:
+        cache = Cache(backend=MemoryBackend())
+        assert cache._get("news_cache", "k") is None
+        cache._put("news_cache", "k", {"x": 1}, 60)
+        assert cache._get("news_cache", "k") == {"x": 1}
 
-    def test_put_json_row_duckdb_error_swallowed(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            fake = MagicMock(wraps=real)
-            fake.execute.side_effect = duckdb.Error("write fail")
-            cache._conn = fake  # type: ignore[assignment]
-            cache._put_json_row("news_cache", "k", {"x": 1}, 60)  # must not raise
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
+    def test_put_then_get_each_table(self) -> None:
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
+        cache.put_ticker_details({"t": "AAPL"}, {"name": "Apple"})
+        cache.put_filings_index({"t": "AAPL"}, {"filings": []})
+        cache.put_dividends({"t": "AAPL"}, {"results": []})
+        assert cache.get_news({"q": "x"}) == {"data": 1}
+        assert cache.get_ticker_details({"t": "AAPL"})["name"] == "Apple"
+        assert cache.get_filings_index({"t": "AAPL"}) == {"filings": []}
+        assert cache.get_dividends({"t": "AAPL"}) == {"results": []}
 
-    def test_expired_row_returns_none(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            cache.put_news({"q": "x"}, {"data": 1})
-            assert cache._conn is not None
-            cache._conn.execute("UPDATE news_cache SET fetched_at = TIMESTAMP '2000-01-01 00:00:00', ttl_seconds = 1")
-            assert cache.get_news({"q": "x"}) is None
-        finally:
-            cache.close()
+    def test_expired_row_returns_none(self) -> None:
+        cache = Cache(backend=MemoryBackend())
+        cache.backend.set("news_cache", "k", {"data": 1}, 0)
+        assert cache.backend.get("news_cache", "k") is None
 
-    def test_record_event_no_conn(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        cache.close()
-        cache._conn = None  # type: ignore[assignment]
-        cache._record_event("hit", "news_cache")  # must not raise
-
-    def test_record_event_duckdb_error_swallowed(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            fake = MagicMock(wraps=real)
-            fake.execute.side_effect = duckdb.Error("insert fail")
-            cache._conn = fake  # type: ignore[assignment]
-            cache._record_event("hit", "news_cache")  # must not raise
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
-
-    def test_quarantine_when_db_missing_sets_conn_none(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            cache.close()
-            (tmp_path / "c.duckdb").unlink(missing_ok=True)
-            cache._quarantine_and_reopen(duckdb.Error("boom"))
-            assert cache._conn is None
-        finally:
-            cache.close()
-
-    def test_quarantine_reopen_success(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            cache._quarantine_and_reopen(duckdb.Error("corrupt"))
-            assert cache._conn is not None
-            assert list(tmp_path.glob("c.duckdb.corrupt-*"))
-        finally:
-            cache.close()
-
-    def test_quarantine_rename_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        import os
-
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            monkeypatch.setattr(os, "rename", lambda *a, **k: (_ for _ in ()).throw(OSError("denied")))
-            cache._quarantine_and_reopen(duckdb.Error("corrupt"))
-            assert cache._conn is None
-        finally:
-            cache.close()
-
-    def test_quarantine_reopen_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        import polygon_news_mcp.cache as cache_mod
-
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            monkeypatch.setattr(
-                cache_mod.duckdb, "connect", lambda *a, **k: (_ for _ in ()).throw(duckdb.Error("reopen fail"))
-            )
-            cache._quarantine_and_reopen(duckdb.Error("corrupt"))
-            assert cache._conn is None
-        finally:
-            cache.close()
-
-    def test_corrupt_db_quarantined_on_open(self, tmp_path: Path) -> None:
-        db = tmp_path / "c.duckdb"
-        db.write_bytes(b"not a valid duckdb file")
-        cache = Cache(db_path=db)
-        try:
-            assert list(tmp_path.glob("c.duckdb.corrupt-*")) or cache._conn is not None
-        finally:
-            cache.close()
-
-    def test_get_stats_count_query_error(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            assert real is not None
-            fake = MagicMock(wraps=real)
-
-            def selective(sql: str, *a: Any, **k: Any) -> Any:
-                if "COUNT(*)" in sql:
-                    raise duckdb.Error("count fail")
-                return real.execute(sql, *a, **k)
-
-            fake.execute.side_effect = selective
-            cache._conn = fake  # type: ignore[assignment]
-            stats = cache.get_stats()
-            assert all(v == 0 for v in stats.rows_per_table.values())
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
-
-    def test_get_stats_conn_none(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        cache.close()
-        cache._conn = None  # type: ignore[assignment]
+    def test_get_stats_shape(self) -> None:
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
         stats = cache.get_stats()
-        assert stats.rows_per_table == {} and stats.hits_24h == 0
+        assert stats.backend == "memory"
+        assert stats.entries == 1
+        assert "backend" in stats.to_dict()
 
-    def test_get_stats_db_file_missing(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            (tmp_path / "c.duckdb").unlink(missing_ok=True)
-            assert cache.get_stats().size_mb == 0.0
-        finally:
-            cache.close()
+    def test_get_stats_size_error_degrades(self) -> None:
+        backend = MemoryBackend()
+        backend.size = lambda: (_ for _ in ()).throw(RuntimeError("size fail"))  # type: ignore[method-assign]
+        cache = Cache(backend=backend)
+        assert cache.get_stats().entries == 0
 
-    def test_get_stats_size_mb_oserror(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real_path = cache.db_path
+    def test_reset_clears_rows(self) -> None:
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
+        cache.reset()
+        assert cache.get_news({"q": "x"}) is None
 
-            class _FlakyPath:
-                def __init__(self, inner: Path) -> None:
-                    self._inner = inner
-
-                def exists(self) -> bool:
-                    return True
-
-                def stat(self) -> Any:
-                    raise OSError("stat failed")
-
-                def __getattr__(self, name: str) -> Any:
-                    return getattr(self._inner, name)
-
-                def __str__(self) -> str:
-                    return str(self._inner)
-
-                def __fspath__(self) -> str:
-                    return str(self._inner)
-
-            cache.db_path = _FlakyPath(real_path)  # type: ignore[assignment]
-            assert cache.get_stats().size_mb == 0.0
-            cache.db_path = real_path
-        finally:
-            cache.close()
-
-    def test_reset_clears_rows(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
+    def test_close_and_context_manager(self) -> None:
+        with Cache(backend=MemoryBackend()) as cache:
             cache.put_news({"q": "x"}, {"data": 1})
-            cache.reset()
-            assert cache.get_news({"q": "x"}) is None
-        finally:
-            cache.close()
+            assert cache.get_news({"q": "x"}) is not None
+        cache.close()  # idempotent
 
-    def test_reset_no_conn(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        cache.close()
-        cache._conn = None  # type: ignore[assignment]
-        cache.reset()  # must not raise
-
-    def test_reset_duckdb_error_swallowed(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            real = cache._conn
-            fake = MagicMock(wraps=real)
-            fake.execute.side_effect = duckdb.Error("delete fail")
-            cache._conn = fake  # type: ignore[assignment]
-            cache.reset()  # must not raise
-            cache._conn = real  # type: ignore[assignment]
-        finally:
-            cache.close()
-
-    def test_parse_dt_branches(self) -> None:
-        from datetime import UTC, datetime
-
-        from polygon_news_mcp.cache import _parse_dt
-
-        assert _parse_dt(None) is None
-        naive = datetime(2026, 1, 1, 12, 0, 0)
-        assert _parse_dt(naive) == naive
-        assert _parse_dt(datetime(2026, 1, 1, tzinfo=UTC)).tzinfo is None  # type: ignore[union-attr]
-        assert _parse_dt("not-a-date") is None
-        assert _parse_dt("2026-01-01T00:00:00Z") is not None
-        assert _parse_dt(12345) is None
-
-    def test_is_expired_branches(self) -> None:
-        from polygon_news_mcp.cache import _is_expired
-
-        assert _is_expired(None, 60) is True
-        assert _is_expired("2000-01-01T00:00:00Z", 1) is True
-        assert _is_expired("garbage", 60) is True
-
-    def test_deserialise_branches(self) -> None:
-        from polygon_news_mcp.cache import _deserialise
-
-        assert _deserialise(None) is None
-        assert _deserialise("[1,2,3]") is None
-        assert _deserialise("not json") is None
-        assert _deserialise('{"ok": 1}') == {"ok": 1}
-        assert _deserialise({"already": "dict"}) == {"already": "dict"}
-
-    def test_secure_chmod_swallows_oserror(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """_secure_chmod swallows OSError from the underlying chmod (87-90)."""
-        import polygon_news_mcp.cache as cache_mod
-
-        target = tmp_path / "f.txt"
-        target.write_text("x")
-        monkeypatch.setattr(
-            cache_mod._platform, "secure_chmod", lambda *a, **k: (_ for _ in ()).throw(OSError("ro fs"))
-        )
-        cache_mod._secure_chmod(target, 0o600)  # must not raise
+    def test_default_backend_is_memory(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("POLYGON_CACHE_BACKEND", raising=False)
+        assert Cache().backend.name == "memory"
 
     def test_get_cache_singleton_reuse(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import polygon_news_mcp.cache as cache_mod

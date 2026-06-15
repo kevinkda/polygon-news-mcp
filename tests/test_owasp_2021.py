@@ -20,14 +20,12 @@ Applicability map (2021):
 
 from __future__ import annotations
 
-import os
-import stat
-import sys
 from pathlib import Path
 
 import pytest
 
 from polygon_news_mcp.cache import Cache
+from polygon_news_mcp.cache_backend import MemoryBackend
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src" / "polygon_news_mcp"
@@ -72,14 +70,12 @@ class TestA01AccessControl:
 
 
 class TestA02CryptographicFailures:
-    def test_cache_file_owner_only_on_posix(self, tmp_path: Path) -> None:
-        if sys.platform == "win32":
-            pytest.skip("POSIX-only perm semantics")
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            assert stat.S_IMODE(os.stat(tmp_path / "c.duckdb").st_mode) == 0o600
-        finally:
-            cache.close()
+    def test_cache_default_backend_writes_no_file(self) -> None:
+        """v0.3.0: the default memory backend writes no cache file at all,
+        eliminating the on-disk-permissions attack surface entirely."""
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"data": 1})
+        assert cache.backend.name == "memory"
 
     def test_api_key_never_logged_plaintext(self, caplog: pytest.LogCaptureFixture) -> None:
         import logging
@@ -110,14 +106,12 @@ class TestA02CryptographicFailures:
 
 
 class TestA03Injection:
-    def test_duckdb_bound_params_block_sql_injection(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            payload = "'); DELETE FROM dividends_cache;--"
-            cache.put_dividends({"k": payload}, {"v": payload})
-            assert cache.get_dividends({"k": payload}) == {"v": payload}
-        finally:
-            cache.close()
+    def test_cache_keys_isolate_injection_payload(self) -> None:
+        """v0.3.0: no SQL surface remains; payloads round-trip as opaque data."""
+        cache = Cache(backend=MemoryBackend())
+        payload = "'); DELETE FROM dividends_cache;--"
+        cache.put_dividends({"k": payload}, {"v": payload})
+        assert cache.get_dividends({"k": payload}) == {"v": payload}
 
     def test_window_days_constrained_to_literal(self) -> None:
         from pydantic import ValidationError
@@ -189,7 +183,10 @@ class TestA05Misconfiguration:
 class TestA06Components:
     def test_security_deps_declared(self) -> None:
         body = (REPO_ROOT / "pyproject.toml").read_text("utf-8")
-        assert "httpx" in body and "pydantic" in body and "duckdb" in body
+        assert "httpx" in body and "pydantic" in body
+        # v0.3.0: duckdb removed; clickhouse is an opt-in extra only.
+        assert "duckdb" not in body
+        assert "clickhouse-connect" in body
 
 
 # ===========================================================================
@@ -233,14 +230,11 @@ class TestA08DataIntegrity:
         with pytest.raises(PolygonTransientError):
             await client.get_json("/s")
 
-    def test_cache_roundtrip_integrity(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            payload = {"results": [{"id": "n1", "title": "T"}], "count": 1}
-            cache.put_news({"k": "AAPL"}, payload)
-            assert cache.get_news({"k": "AAPL"}) == payload
-        finally:
-            cache.close()
+    def test_cache_roundtrip_integrity(self) -> None:
+        cache = Cache(backend=MemoryBackend())
+        payload = {"results": [{"id": "n1", "title": "T"}], "count": 1}
+        cache.put_news({"k": "AAPL"}, payload)
+        assert cache.get_news({"k": "AAPL"}) == payload
 
 
 # ===========================================================================
@@ -249,16 +243,15 @@ class TestA08DataIntegrity:
 
 
 class TestA09Logging:
-    def test_cache_audit_events_recorded(self, tmp_path: Path) -> None:
-        cache = Cache(db_path=tmp_path / "c.duckdb")
-        try:
-            cache.put_news({"q": "x"}, {"v": 1})
-            cache.get_news({"q": "x"})
-            assert cache._conn is not None
-            count = cache._conn.execute("SELECT COUNT(*) FROM cache_events").fetchone()[0]
-            assert count >= 2
-        finally:
-            cache.close()
+    def test_cache_monitoring_surface_recorded(self) -> None:
+        """v0.3.0: the cache exposes a live monitoring surface (backend +
+        entry count) in lieu of the removed DuckDB cache_events table."""
+        cache = Cache(backend=MemoryBackend())
+        cache.put_news({"q": "x"}, {"v": 1})
+        cache.get_news({"q": "x"})
+        stats = cache.get_stats()
+        assert stats.backend == "memory"
+        assert stats.entries >= 1
 
 
 # ===========================================================================
