@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `RLock` that could serialise the asyncio event loop, plus all on-disk
     cache files, file locks, and the corrupt-DB quarantine machinery.
   - **clickhouse** (opt-in) — `pip install polygon-news-mcp[clickhouse]`
-    + `POLYGON_CLICKHOUSE_URL` + `POLYGON_CACHE_BACKEND=clickhouse` for
+    with `POLYGON_CLICKHOUSE_URL` and `POLYGON_CACHE_BACKEND=clickhouse` for
     durable derived-analysis history (`append_timeseries` /
     `query_timeseries`). `clickhouse_connect` is imported lazily, so a
     default install never pays for it; a missing extra raises a friendly
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line+branch coverage preserved (memory concurrency/LRU/TTL, ClickHouse via
   a mocked client, degradation, and factory fallback paths).
 
-
+## [0.2.2] - 2026-06-10
 
 ### Changed
 
